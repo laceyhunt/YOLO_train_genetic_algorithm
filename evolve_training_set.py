@@ -44,7 +44,7 @@ def save_class_history(vals,filename=class_history_file):
 start_per_label_csv(class_labels)
 save_history_header()
 # Number of images in each training set (Individual)
-train_sample_size = 10# was 80
+train_sample_size = 90
 min_sample_size=50
 max_sample_size=120
 # Number of images in the shared training set
@@ -56,19 +56,19 @@ deletion_probability = .03
 # Probability of insertion (out of 1)
 insertion_probability = .03
 # Number of individuals in a population
-pop_size = 5
+pop_size = 50
 # Size of the tournament
 tournament_size = 5
 # Maximum generations for GA
-max_generations = 1000
-# Number of individuals advanced into the next generation   CHANGED FOR DEBUG
-elitism_num = 2
+max_generations = 500
+# Number of individuals advanced into the next generation
+elitism_num = 5
 # Maximum length of an insertion
 max_insertion_length = 5
 # Maximum length of a deletion
 max_deletion_length = 5
 # YOLO model training parameters
-yolo_max_generations =  10                    #500
+yolo_max_generations = 300
 yolo_patience=50
 val_ratio=0.2
 pretrained_model='yolov8n.pt'
@@ -190,33 +190,33 @@ class Individual:
     self.calculate_fitness()
 
   def calculate_fitness(self):
-    # global test_dir
-    # model = YOLO("yolov8n.pt") # load a pretrained model (for transfer learning)
-    # results = model.train(data=self.dir_str, 
-    #                       patience=yolo_patience, 
-    #                       epochs=yolo_max_generations,
-    #                       verbose=False,
-    #                       save=False,
-    #                       plots=False,
-    #                       exist_ok=True)
-    # # os.path.join(test_dir, 'test_data.yaml')
-    # metrics = model.val(
-    #         # data='shared_test_set/test.yaml',
-    #         data=f'{test_dir}/test_data.yaml',
-    #         split='test',
-    #         plots=False,
-    #         verbose=False)
-    # self.fitness = metrics.maps.mean() # maps is for each image category so i take mean to account for all
-    # self.per_class_map = metrics.maps.tolist()  # store per-class mAPs as a list
+    global test_dir
+    model = YOLO("yolov8n.pt") # load a pretrained model (for transfer learning)
+    results = model.train(data=self.dir_str, 
+                          patience=yolo_patience, 
+                          epochs=yolo_max_generations,
+                          verbose=False,
+                          save=False,
+                          plots=False,
+                          exist_ok=True)
+    # os.path.join(test_dir, 'test_data.yaml')
+    metrics = model.val(
+            # data='shared_test_set/test.yaml',
+            data=f'{test_dir}/test_data.yaml',
+            split='test',
+            plots=False,
+            verbose=False)
+    self.fitness = metrics.maps.mean() # maps is for each image category so i take mean to account for all
+    self.per_class_map = metrics.maps.tolist()  # store per-class mAPs as a list
 
 
-    # print(" ***** METRICS ****")
-    # print(model.names) # for class labels for the following mAPs...
-    # print(metrics.maps)
-    # save_class_history(self.per_class_map)
+    print(" ***** METRICS ****")
+    print(model.names) # for class labels for the following mAPs...
+    print(metrics.maps)
+    save_class_history(self.per_class_map)
     
-    self.per_class_map=[1,2,3,4,5,6,7,8,9,2,3,1]
-    self.fitness=self.number*2
+    # self.per_class_map=[1,2,3,4,5,6,7,8,9,2,3,1]
+    # self.fitness=self.number*2
   
   def single_point_crossover(self, p2_dir, child, split):
     p1_dir=self.indiv_dir
@@ -519,7 +519,7 @@ history = {
     # 'per_class_map': [],  # List of best indiv's per-class maps per generation
 }
 
-for gen in range(3):
+for gen in range(max_generations):
     print(f"\n\n--- Generation {gen} ---")
     p1.populate()  # The function handles everything internally
     
@@ -534,13 +534,14 @@ for gen in range(3):
 
     # print(f"History MAP: {history['per_class_map']}")
 
-    # Optional: Early stopping if fitness stagnates or hits some threshold
-    # if p1.best_fitness >= .99:  # Adjust this threshold as needed
-    #     print("Early stopping: desired fitness reached.")
-    #     break
+    # Early stopping if fitness stagnates or hits some threshold
+    if p1.best_fitness >= .99:  # Adjust this threshold as needed
+        print("Early stopping: desired fitness reached.")
+        break
     
     # Save the history after each generation
     save_history_to_csv(history)
 
+print("Finished Training.")
 # Plot the per-class mAP over generations
 # plot_per_class_map(history)
