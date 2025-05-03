@@ -73,6 +73,8 @@ yolo_patience=50
 val_ratio=0.2
 pretrained_model='yolov8n.pt'
 output_log_file='yolo_output_file.txt'
+new_pop_dir_name='new_pop'
+
 
 # Path to original dataset
 source_dir = 'dataset_reorganized'
@@ -136,13 +138,15 @@ with open(os.path.join(test_dir, 'test_data.yaml'), 'w') as f:
 # Individual class, where each individual is a YOLO directory
 class Individual:
   # Initialization
-  def __init__(self):
+  def __init__(self, indiv_size=train_sample_size):
     global indiv_num, new_root,train_sample_size,val_ratio,train_images
-
+    print("\n\nMaking an individual from __init__()...")
     self.fitness = 0
     self.number=indiv_num
     self.indiv_dir = os.path.join(new_root, f'indiv_{self.number}')
-    self.dir_str = new_root + f"/indiv_{self.number}/data.yaml"
+    self.dir_str = new_root + f"/indiv_{self.number}/data.yaml" 
+    # self.indiv_dir = os.path.join(new_pop_dir_name, f'indiv_{self.number}')
+    # self.dir_str = new_pop_dir_name + f"/indiv_{self.number}/data.yaml"
     self.per_class_map=[]
     self.num_train_imgs=0
     self.num_val_imgs=0
@@ -154,8 +158,9 @@ class Individual:
     os.makedirs(os.path.join(self.indiv_dir, 'labels/val'), exist_ok=True)
 
     # Sample and split training set
-    sample = random.sample(train_images, train_sample_size)
-    val_size = int(train_sample_size * val_ratio)
+    sample = random.sample(train_images, indiv_size)
+    # print(f"\n\n\n***RANDOM SAMPLE: {sample}")
+    val_size = int(indiv_size * val_ratio)
     val_images = sample[:val_size]
     train_images_subset = sample[val_size:]
 
@@ -190,33 +195,34 @@ class Individual:
     self.calculate_fitness()
 
   def calculate_fitness(self):
-    global test_dir
-    model = YOLO("yolov8n.pt") # load a pretrained model (for transfer learning)
-    results = model.train(data=self.dir_str, 
-                          patience=yolo_patience, 
-                          epochs=yolo_max_generations,
-                          verbose=False,
-                          save=False,
-                          plots=False,
-                          exist_ok=True)
-    # os.path.join(test_dir, 'test_data.yaml')
-    metrics = model.val(
-            # data='shared_test_set/test.yaml',
-            data=f'{test_dir}/test_data.yaml',
-            split='test',
-            plots=False,
-            verbose=False)
-    self.fitness = metrics.maps.mean() # maps is for each image category so i take mean to account for all
-    self.per_class_map = metrics.maps.tolist()  # store per-class mAPs as a list
+    # global test_dir
+    # model = YOLO("yolov8n.pt") # load a pretrained model (for transfer learning)
+    # results = model.train(data=self.dir_str, 
+    #                       patience=yolo_patience, 
+    #                       epochs=yolo_max_generations,
+    #                       verbose=False,
+    #                       save=False,
+    #                       plots=False,
+    #                       exist_ok=True)
+    # # os.path.join(test_dir, 'test_data.yaml')
+    # metrics = model.val(
+    #         # data='shared_test_set/test.yaml',
+    #         data=f'{test_dir}/test_data.yaml',
+    #         split='test',
+    #         plots=False,
+    #         verbose=False)
+    # self.fitness = metrics.maps.mean() # maps is for each image category so i take mean to account for all
+    # self.per_class_map = metrics.maps.tolist()  # store per-class mAPs as a list
 
 
-    print(" ***** METRICS ****")
-    print(model.names) # for class labels for the following mAPs...
-    print(metrics.maps)
-    save_class_history(self.per_class_map)
+    # print(" ***** METRICS ****")
+    # print(model.names) # for class labels for the following mAPs...
+    # print(metrics.maps)
+    # save_class_history(self.per_class_map)
     
-    # self.per_class_map=[1,2,3,4,5,6,7,8,9,2,3,1]
-    # self.fitness=self.number*2
+    print(f"calculating fitness for indiv {self.number} at {str(self.dir_str)}")
+    self.per_class_map=[1,2,3,4,5,6,7,8,9,2,3,1]
+    self.fitness=self.number*.1
   
   def single_point_crossover(self, p2_dir, child, split):
     p1_dir=self.indiv_dir
@@ -257,6 +263,11 @@ class Individual:
     #   copy_img_and_label(img, p1_dir, child_dir, split)
     # for img in p2_imgs[crossover_point:]:
     #   copy_img_and_label(img, p2_dir, child_dir, split)
+
+
+    print(f"\n\n\n***PARENT 1: {p1_imgs}")
+    print(f"\n\n\n***PARENT 2: {p2_imgs}")
+
 
     if split=='train':
        child.num_train_imgs = min_len
@@ -309,12 +320,16 @@ class Individual:
                 delete_img_and_label(img, child_dir, split)
                 child.num_train_imgs-=1
 
+    # print(f"\n\n\n***CHILD: {os.listdir(os.path.join(child_dir,'/images/train'))}")
+    # print(f"CHILD DIR IS: {child_dir}")
+
 
 
   def mate(self, other, num):
     global indiv_num, new_root, mutation_probability
     new_pop_dir_name='new_pop'
     child = Individual.__new__(Individual)  # Avoid calling __init__
+    print("\n\nMaking an individual from __new__()...")
 
     # Set unique directory for the child
     # child.number = indiv_num
@@ -370,8 +385,9 @@ class Individual:
 
 
 class Population():
-  def __init__(self):
-    global pop_size,new_root
+  def __init__(self, num_indivs=pop_size, indiv_size=train_sample_size):
+    global new_root
+    self.pop_size=num_indivs
     self.average_fitness=0
     self.best_fitness=0
     self.generation_num=0
@@ -382,8 +398,8 @@ class Population():
       shutil.rmtree(self.new_pop_dir)
 
     self.best_per_class_map=[]
-    for i in range(0,pop_size):
-      self.the_pop.append(Individual())
+    for i in range(0,num_indivs):
+      self.the_pop.append(Individual(indiv_size))
     self.elite_dir=os.path.join(new_root, 'elites')
     if os.path.exists(self.elite_dir):
       shutil.rmtree(self.elite_dir)
@@ -392,16 +408,14 @@ class Population():
     self.calculate_best_fitness()
   
   def calculate_avg_fitness(self):
-    global pop_size
     total_fitness = 0
-    for i in range(0, pop_size):
+    for i in range(0, self.pop_size):
       total_fitness += self.the_pop[i].fitness
-    self.average_fitness = total_fitness/pop_size
+    self.average_fitness = total_fitness/self.pop_size
   
   def calculate_best_fitness(self):
-    global pop_size
     best = self.the_pop[0].fitness
-    for i in range(1, pop_size):
+    for i in range(1, self.pop_size):
       if self.the_pop[i].fitness > best:
         best = self.the_pop[i].fitness
         self.best_per_class_map=self.the_pop[i].per_class_map
@@ -419,7 +433,7 @@ class Population():
     return child
   
   def populate(self):
-    global pop_size, elitism_num
+    global elitism_num
     self.generation_num+=1
 
     os.makedirs(f'{self.new_pop_dir_name}')
@@ -440,7 +454,7 @@ class Population():
       self.the_pop[i] = elite  # Reassign for clarity
 
     # Overwrite the rest with new offspring
-    for i in range(elitism_num+1, pop_size):
+    for i in range(elitism_num+1, self.pop_size):
       # Make a child
       child=self.make_offspring(num=i)
       self.the_pop[i] = child
@@ -460,10 +474,9 @@ class Population():
 
 
   def print(self):
-    global pop_size
     print(f"Average Fitness: {self.average_fitness}")
     print(f"Best Fitness: {self.best_fitness}")
-    for i in range(0,pop_size):
+    for i in range(0,self.pop_size):
       print(self.the_pop[i])
   
   def archive_best(self):
@@ -509,8 +522,9 @@ def plot_per_class_map(history):
     plt.show()
 
 # === MAIN GA LOOP ===
-p1 = Population()
+p1 = Population(num_indivs=10,indiv_size=10)
 p1.print()
+
 
 history = {
     'generation': [],
@@ -519,7 +533,7 @@ history = {
     # 'per_class_map': [],  # List of best indiv's per-class maps per generation
 }
 
-for gen in range(max_generations):
+for gen in range(10):                                        #change back to max_generations
     print(f"\n\n--- Generation {gen} ---")
     p1.populate()  # The function handles everything internally
     
@@ -535,9 +549,9 @@ for gen in range(max_generations):
     # print(f"History MAP: {history['per_class_map']}")
 
     # Early stopping if fitness stagnates or hits some threshold
-    if p1.best_fitness >= .99:  # Adjust this threshold as needed
-        print("Early stopping: desired fitness reached.")
-        break
+    # if p1.best_fitness >= .99:  # Adjust this threshold as needed
+    #     print("Early stopping: desired fitness reached.")
+    #     break
     
     # Save the history after each generation
     save_history_to_csv(history)
@@ -545,3 +559,28 @@ for gen in range(max_generations):
 print("Finished Training.")
 # Plot the per-class mAP over generations
 # plot_per_class_map(history)
+
+
+# with open('test.csv', mode='a', newline='') as file:
+#     writer = csv.writer(file)
+
+#     # Write just recent row of data for the generation
+#     row = [
+#         'run','50 indivs','100 indivs','500 indivs'
+#     ]# + history['per_class_map'][i]  # Append per-class mAPs
+#     writer.writerow(row)
+# for i in range(3):
+#     i1=Individual(50)
+#     fifty_fit=i1.fitness
+#     i2=Individual(100)
+#     hundred_fit=i2.fitness
+#     i3=Individual(500)
+#     fivehund_fit=i3.fitness
+#     with open('test.csv', mode='a', newline='') as file:
+#         writer = csv.writer(file)
+
+#         # Write just recent row of data for the generation
+#         row = [
+#             i,fifty_fit, hundred_fit,fivehund_fit
+#         ]# + history['per_class_map'][i]  # Append per-class mAPs
+#         writer.writerow(row)

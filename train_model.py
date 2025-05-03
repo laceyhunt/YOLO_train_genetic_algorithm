@@ -11,13 +11,13 @@ import sys
 # results = model.train(data="dataset_reorganized/data.yaml", epochs=100, imgsz=640)
 
 
-log_file = open("train_log.txt", "w")
-sys.stdout = log_file
-sys.stderr = log_file
+# log_file = open("train_log.txt", "w")
+# sys.stdout = log_file
+# sys.stderr = log_file
 
 
 model = YOLO("yolov8n.pt") # load a pretrained model (for transfer learning)
-results = model.train(data='indivs/indiv_0/data.yaml', 
+results = model.train(data='new_pop/indiv_2/data.yaml', 
                     patience=50, 
                     epochs=50,
                     verbose=False,
@@ -26,11 +26,11 @@ results = model.train(data='indivs/indiv_0/data.yaml',
                     exist_ok=True)
 # os.path.join(test_dir, 'test_data.yaml')
 # restore after
-sys.stdout = sys.__stdout__
-sys.stderr = sys.__stderr__
+# sys.stdout = sys.__stdout__
+# sys.stderr = sys.__stderr__
 
-sys.stdout = log_file
-sys.stderr = log_file
+# sys.stdout = log_file
+# sys.stderr = log_file
 
 metrics = model.val(
         # data='shared_test_set/test.yaml',
@@ -43,9 +43,9 @@ fitness = metrics.maps.mean() # maps is for each image category so i take mean t
 
 
 # restore after
-sys.stdout = sys.__stdout__
-sys.stderr = sys.__stderr__
-log_file.close()
+# sys.stdout = sys.__stdout__
+# sys.stderr = sys.__stderr__
+# log_file.close()
 
 print(" ***** METRICS ****")
 print(model.names) # for class labels for the following mAPs...
