@@ -148,8 +148,6 @@ class Individual:
     # self.indiv_dir = os.path.join(new_pop_dir_name, f'indiv_{self.number}')
     # self.dir_str = new_pop_dir_name + f"/indiv_{self.number}/data.yaml"
     self.per_class_map=[]
-    self.num_train_imgs=0
-    self.num_val_imgs=0
 
     # Only make train and val since test is shared in the population
     os.makedirs(os.path.join(self.indiv_dir, 'images/train'), exist_ok=True)
@@ -164,6 +162,8 @@ class Individual:
     val_images = sample[:val_size]
     train_images_subset = sample[val_size:]
 
+    self.num_train_imgs=0
+    self.num_val_imgs=0
     # Copy training set
     for img_name in train_images_subset:
       label_name = img_name.rsplit('.', 1)[0] + '.txt'
@@ -195,43 +195,44 @@ class Individual:
     self.calculate_fitness()
 
   def calculate_fitness(self):
-    # global test_dir
-    # model = YOLO("yolov8n.pt") # load a pretrained model (for transfer learning)
-    # results = model.train(data=self.dir_str, 
-    #                       patience=yolo_patience, 
-    #                       epochs=yolo_max_generations,
-    #                       verbose=False,
-    #                       save=False,
-    #                       plots=False,
-    #                       exist_ok=True)
-    # # os.path.join(test_dir, 'test_data.yaml')
-    # metrics = model.val(
-    #         # data='shared_test_set/test.yaml',
-    #         data=f'{test_dir}/test_data.yaml',
-    #         split='test',
-    #         plots=False,
-    #         verbose=False)
-    # self.fitness = metrics.maps.mean() # maps is for each image category so i take mean to account for all
-    # self.per_class_map = metrics.maps.tolist()  # store per-class mAPs as a list
+    global test_dir
+    model = YOLO("yolov8n.pt") # load a pretrained model (for transfer learning)
+    results = model.train(data=self.dir_str, 
+                          patience=yolo_patience, 
+                          epochs=yolo_max_generations,
+                          verbose=False,
+                          save=False,
+                          plots=False,
+                          exist_ok=True)
+    # os.path.join(test_dir, 'test_data.yaml')
+    metrics = model.val(
+            # data='shared_test_set/test.yaml',
+            data=f'{test_dir}/test_data.yaml',
+            split='test',
+            plots=False,
+            verbose=False)
+    self.fitness = metrics.maps.mean() # maps is for each image category so i take mean to account for all
+    self.per_class_map = metrics.maps.tolist()  # store per-class mAPs as a list
 
 
-    # print(" ***** METRICS ****")
-    # print(model.names) # for class labels for the following mAPs...
-    # print(metrics.maps)
-    # save_class_history(self.per_class_map)
+    print(" ***** METRICS ****")
+    print(model.names) # for class labels for the following mAPs...
+    print(metrics.maps)
     
-    print(f"calculating fitness for indiv {self.number} at {str(self.dir_str)}")
-    self.per_class_map=[1,2,3,4,5,6,7,8,9,2,3,1]
-    self.fitness=self.number*.1
+    # print(f"calculating fitness for indiv {self.number} at {str(self.dir_str)}\nwith train size {self.num_train_imgs} and val {self.num_val_imgs}")
+    # self.per_class_map=[1,2,3,4,5,6,7,8,9,2,3,1]
+    # self.fitness=self.number*.1
+
   
   def single_point_crossover(self, p2_dir, child, split):
+    global max_sample_size,min_sample_size
     p1_dir=self.indiv_dir
     child_dir=child.indiv_dir
     # Helper to get the images from parent
     def get_images(parent_dir, split):
       return [f for f in os.listdir(os.path.join(parent_dir, f'images/{split}')) if f.endswith('.jpg') or f.endswith('.JPG')]
     # Helper to copy images and labels as we go into the child
-    def copy_img_and_label(img_name, parent_dir, child_dir, split, raw=False):
+    def copy_img_and_label(img_name, parent_dir, child_dir, split, child,raw=False):
       if raw:
         src_img = os.path.join(parent_dir, img_name)
         src_lbl = os.path.join(parent_dir.replace('images', 'labels'), img_name.rsplit('.', 1)[0] + '.txt')
@@ -240,21 +241,32 @@ class Individual:
         src_lbl = os.path.join(parent_dir, f'labels/{split}', img_name.rsplit('.', 1)[0] + '.txt')
       dst_img = os.path.join(child_dir, f'images/{split}', img_name)
       dst_lbl = os.path.join(child_dir, f'labels/{split}', img_name.rsplit('.', 1)[0] + '.txt')
+      if split=='train':
+        child.num_train_imgs+=1
+      else:
+        child.num_val_imgs+=1
       shutil.copy(src_img, dst_img)
       shutil.copy(src_lbl, dst_lbl)
 
     # Helper to remove for mutation/deletion
-    def delete_img_and_label(img_name, child_dir, split):
+    def delete_img_and_label(img_name, child_dir, split,child):
         try:
-            os.remove(os.path.join(child_dir, f'images/{split}', img_name))
-            os.remove(os.path.join(child_dir, f'labels/{split}', img_name.rsplit('.', 1)[0] + '.txt'))
+          os.remove(os.path.join(child_dir, f'images/{split}', img_name))
+          os.remove(os.path.join(child_dir, f'labels/{split}', img_name.rsplit('.', 1)[0] + '.txt'))
+          if split=='train':
+            child.num_train_imgs-=1
+          else:
+            child.num_val_imgs-=1
         except Exception as e:
             print(f"Failed to delete {img_name}: {e}")
 
 
     p1_imgs = get_images(p1_dir, split)
     p2_imgs = get_images(p2_dir, split)
-    min_len = min(len(p1_imgs), len(p2_imgs))
+    p1_len=len(p1_imgs)
+    p2_len=len(p2_imgs)
+    min_len = min(p1_len, p2_len)
+    max_len = max(p1_len, p2_len)
     if min_len == 0:
       print("One of the parents in sp crossover is empty")
       return
@@ -265,60 +277,62 @@ class Individual:
     #   copy_img_and_label(img, p2_dir, child_dir, split)
 
 
-    print(f"\n\n\n***PARENT 1: {p1_imgs}")
-    print(f"\n\n\n***PARENT 2: {p2_imgs}")
+    # print(f"\n\n\n***PARENT 1: {p1_imgs}")
+    # print(f"\n\n\n***PARENT 2: {p2_imgs}")
 
 
-    if split=='train':
-       child.num_train_imgs = min_len
-    else:
-      if split=='val':
-       child.num_val_imgs = min_len
+    # if split=='train':
+    #   child.num_train_imgs = min_len # if random.random()<0.5 else max_len
+    # else:
+    #   if split=='val':
+    #    child.num_val_imgs = min_len
 
     used_sources = set()  # Avoid duplicate source images
     crossover_point = random.randint(1, min_len - 1)
 
-    for i in range(min_len):
-        if random.random() < mutation_probability and len(train_images) > 0:
-            # print("mutation")
-            # Use mutation image from source_dir instead
-            candidates = [img for img in train_images if img not in used_sources]
-            if candidates:
-                img = random.choice(candidates)
-                used_sources.add(img)
-                try:
-                    copy_img_and_label(img, train_images_dir, child_dir, split,raw=True)
-                except Exception as e:
-                    print(f"Failed mutation copy: {e}")
-            else:
-                # Standard crossover
-                img = p1_imgs[i] if i < crossover_point else p2_imgs[i]
-                copy_img_and_label(img, p1_dir if i < crossover_point else p2_dir, child_dir, split)
+    loop_range = min_len # if split=='val' else child.num_train_imgs
+    for i in range(loop_range):
+      if random.random() < mutation_probability and len(train_images) > 0:
+        # print("mutation")
+        # Use mutation image from source_dir instead
+        candidates = [img for img in train_images if img not in used_sources]
+        if candidates:
+          img = random.choice(candidates)
+          used_sources.add(img)
+          try:
+            copy_img_and_label(img, train_images_dir, child_dir, split,child,raw=True)
+          except Exception as e:
+            print(f"Failed mutation copy: {e}")
         else:
-            # Standard crossover
-            img = p1_imgs[i] if i < crossover_point else p2_imgs[i]
-            copy_img_and_label(img, p1_dir if i < crossover_point else p2_dir, child_dir, split)
-    if split=='train':
-        # Insertion 
-        if (random.random() < insertion_probability) and (child.num_train_imgs < max_sample_size):
-            # print("insertion")
-            available = [img for img in train_images if img not in used_sources]
-            insert_count = random.randint(1, max_insertion_length)
-            random.shuffle(available)
-            for img in available[:insert_count]:
-                copy_img_and_label(img, source_dir, child_dir, split)
-                child.num_train_imgs+=1
-                used_sources.add(img)
-        # Deletion
-        if (random.random() < deletion_probability) and (child.num_train_imgs > min_sample_size):
-            # print("deletion")
-            child_img_dir = os.path.join(child_dir, f'images/{split}')
-            existing_imgs = os.listdir(child_img_dir)
-            delete_count =  random.randint(1, max_deletion_length)
-            random.shuffle(existing_imgs)
-            for img in existing_imgs[:delete_count]:
-                delete_img_and_label(img, child_dir, split)
-                child.num_train_imgs-=1
+          # Standard crossover
+          img = p1_imgs[i] if (i < crossover_point) else p2_imgs[i]
+          copy_img_and_label(img, p1_dir if i < crossover_point else p2_dir, child_dir, split,child)
+      else:
+        # Standard crossover
+        img = p1_imgs[i] if (i < crossover_point) else p2_imgs[i]
+        copy_img_and_label(img, p1_dir if i < crossover_point else p2_dir, child_dir, split,child)
+
+    if split=='train': 
+      # Insertion 
+      if (random.random() < insertion_probability) and (child.num_train_imgs < max_sample_size):
+        # print("insertion")
+        available = [img for img in train_images if img not in used_sources]
+        insert_count = random.randint(1, max_insertion_length)
+        random.shuffle(available)
+        for img in available[:insert_count]:
+          copy_img_and_label(img, source_dir, child_dir, split,child)
+          # child.num_train_imgs+=1
+          used_sources.add(img)
+      # Deletion
+      if (random.random() < deletion_probability) and (child.num_train_imgs > min_sample_size):
+        # print("deletion")
+        child_img_dir = os.path.join(child_dir, f'images/{split}')
+        existing_imgs = os.listdir(child_img_dir)
+        delete_count =  random.randint(1, max_deletion_length)
+        random.shuffle(existing_imgs)
+        for img in existing_imgs[:delete_count]:
+          delete_img_and_label(img, child_dir, split,child)
+          # child.num_train_imgs-=1
 
     # print(f"\n\n\n***CHILD: {os.listdir(os.path.join(child_dir,'/images/train'))}")
     # print(f"CHILD DIR IS: {child_dir}")
@@ -454,7 +468,7 @@ class Population():
       self.the_pop[i] = elite  # Reassign for clarity
 
     # Overwrite the rest with new offspring
-    for i in range(elitism_num+1, self.pop_size):
+    for i in range(elitism_num, self.pop_size):
       # Make a child
       child=self.make_offspring(num=i)
       self.the_pop[i] = child
@@ -470,7 +484,7 @@ class Population():
     # calculate new population statistics
     self.calculate_avg_fitness()
     self.calculate_best_fitness()
-    save_class_history(self.best_per_class_map)
+    # save_class_history(self.best_per_class_map) Done in main
 
 
   def print(self):
@@ -522,8 +536,8 @@ def plot_per_class_map(history):
     plt.show()
 
 # === MAIN GA LOOP ===
-p1 = Population(num_indivs=10,indiv_size=10)
-p1.print()
+p1 = Population()#num_indivs=10,indiv_size=10)
+# p1.print()
 
 
 history = {
@@ -532,29 +546,30 @@ history = {
     'mean_fitness': [],
     # 'per_class_map': [],  # List of best indiv's per-class maps per generation
 }
-
+class_map_history = {}
 for gen in range(10):                                        #change back to max_generations
-    print(f"\n\n--- Generation {gen} ---")
-    p1.populate()  # The function handles everything internally
-    
-    # Get all the bests for this generation
-    per_class_map = p1.best_per_class_map
-    
-    # Store metrics in history
-    history['generation'].append(gen)
-    history['best_fitness'].append(p1.best_fitness)
-    history['mean_fitness'].append(p1.average_fitness)
-    # history['per_class_map'].append(per_class_map)
+  print(f"\n\n--- Generation {gen} ---")
+  p1.populate()  # The function handles everything internally
+  
+  # Get all the bests for this generation
+  per_class_map = p1.best_per_class_map
+  save_class_history(per_class_map)
+  
+  # Store metrics in history
+  history['generation'].append(gen)
+  history['best_fitness'].append(p1.best_fitness)
+  history['mean_fitness'].append(p1.average_fitness)
+  # history['per_class_map'].append(per_class_map)
 
-    # print(f"History MAP: {history['per_class_map']}")
+  # print(f"History MAP: {history['per_class_map']}")
 
-    # Early stopping if fitness stagnates or hits some threshold
-    # if p1.best_fitness >= .99:  # Adjust this threshold as needed
-    #     print("Early stopping: desired fitness reached.")
-    #     break
-    
-    # Save the history after each generation
-    save_history_to_csv(history)
+  # Early stopping if fitness stagnates or hits some threshold
+  # if p1.best_fitness >= .99:  # Adjust this threshold as needed
+  #     print("Early stopping: desired fitness reached.")
+  #     break
+  
+  # Save the history after each generation
+  save_history_to_csv(history)
 
 print("Finished Training.")
 # Plot the per-class mAP over generations
