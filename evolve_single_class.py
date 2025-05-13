@@ -1,10 +1,14 @@
-# MV_trainingset_indivs
+"""
+This code does similar to 'evolve_training_set.py' except does just one class instead of multiple.
+This allows it to focus more on evolving the number of input training images rather than comparing their contents,
+    because too many classes showed less improvement over time than initally expected.
+"""
 
 import random
-import numpy as np
+# import numpy as np
 import matplotlib.pyplot as plt
 import shutil
-import pandas as pd
+# import pandas as pd
 import os
 from ultralytics import YOLO
 import matplotlib.pyplot as plt
