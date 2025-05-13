@@ -426,13 +426,15 @@ class Population():
     if os.path.exists(self.new_pop_dir):
       shutil.rmtree(self.new_pop_dir)
 
-    self.best_per_class_map=[]
-    for i in range(0,num_indivs):
-      self.the_pop.append(Individual(indiv_size))
     self.elite_dir=os.path.join(new_root, 'elites')
     if os.path.exists(self.elite_dir):
       shutil.rmtree(self.elite_dir)
     os.makedirs(self.elite_dir)
+
+    self.best_per_class_map=[]
+    for i in range(0,num_indivs):
+      self.the_pop.append(Individual(indiv_size))
+    
     self.calculate_avg_fitness()
     self.calculate_best_fitness()
   
@@ -470,17 +472,18 @@ class Population():
     # self.archive_elites()
     self.the_pop.sort(reverse=True)  # Sort by fitness (best first)
 
-    # Save the top individuals
+    # Save the top individual
     for i in range(elitism_num):
       elite = self.the_pop[i] # .copy()
       if i==0:
         self.elite=elite
-        self.archive_best()
+        # self.archive_best()
       new_path = os.path.join(f'{self.new_pop_dir_name}', f'indiv_{i}')
       # os.makedirs(f'{new_path}')
       if elite.indiv_dir != new_path:
         shutil.copytree(elite.indiv_dir, new_path)
         elite.indiv_dir = new_path
+      self.archive_best(i)
       self.the_pop[i] = elite  # Reassign for clarity
 
     # Overwrite the rest with new offspring
@@ -509,9 +512,9 @@ class Population():
     for i in range(0,self.pop_size):
       print(self.the_pop[i])
   
-  def archive_best(self):
+  def archive_best(self,ind_num=0):
     # global new_root
-    cur_elite_dir = os.path.join(self.elite_dir, f'gen_{self.generation_num}')
+    cur_elite_dir = os.path.join(self.elite_dir, f'gen_{self.generation_num}',f'indiv_{ind_num}')
     # os.makedirs(cur_elite_dir)
     shutil.copytree(self.elite.indiv_dir, cur_elite_dir)
 
