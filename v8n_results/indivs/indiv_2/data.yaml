@@ -1,0 +1,17 @@
+path: /home/maryeverett/Documents/lacey_weed_detection_dataset/new_pop/indiv_2/data.yaml
+train: images/train
+val: images/val
+names:
+     0: Blackbean
+     1: Flax
+     2: Canola
+     3: Kochia
+     4: Sugar beet
+     5: Soybean
+     6: Waterhemp
+     7: Ragweed
+     8: Redroot Pigweed
+     9: Lentil
+     10: Corn
+     11: Field Pea
+     12: Horseweed
