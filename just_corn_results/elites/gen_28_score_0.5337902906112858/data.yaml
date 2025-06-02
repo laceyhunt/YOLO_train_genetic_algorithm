@@ -1,0 +1,17 @@
+path: /home/maryeverett/Documents/lacey_weed_detection_dataset/elites/gen_28_score_0.5337902906112858
+train: images/train
+val: images/val
+names:
+     0: Blackbean
+     1: Canola
+     2: Corn
+     3: Field Pea
+     4: Flax
+     5: Horseweed
+     6: Kochia
+     7: Lentil
+     8: Ragweed
+     9: Redroot Pigweed
+     10: Soybean
+     11: Sugar beet
+     12: Waterhemp
