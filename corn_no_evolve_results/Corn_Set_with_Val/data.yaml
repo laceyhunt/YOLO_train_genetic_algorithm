@@ -1,0 +1,18 @@
+path: ./Corn_Set_with_Val
+train: images/train
+val: images/val
+test: images/test
+names:
+   0: Blackbean
+   1: Canola
+   2: Ragweed
+   3: Flax
+   4: Waterhemp
+   5: Lentil
+   6: Corn
+   7: Kochia
+   8: Sugar beet
+   9: Soybean
+   10: Redroot Pigweed
+   11: Field Pea
+   12: Horseweed
